@@ -1,39 +1,82 @@
 "use client";
 
-import Image from "next/image";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { getImages } from "./actions/image";
 import { Image as ImageType } from "@prisma/client";
-import { motion, AnimatePresence } from "framer-motion";
 import Fuse from "fuse.js";
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import debounce from "lodash/debounce";
-import Modal from "./components/modal";
 
-// Move Fuse options outside component to avoid recreation
+import SearchBar from "./components/search-bar";
+import HeaderCard from "./components/header-card";
+import ImageGrid from "./components/image-grid";
+
+// Constants
+const ITEMS_PER_PAGE = 12;
+const SEARCH_DEBOUNCE_MS = 300;
+
+// Fuse options
 const fuseOptions = {
   keys: ["code", "number"],
-  threshold: 0.4,
+  threshold: 0.0,
   includeScore: true,
+  ignoreLocation: true,
+  useExtendedSearch: true,
+  findAllMatches: false,
+  minMatchCharLength: 1
 };
 
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: {
+    opacity: 0,
+    y: 20,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring",
+      stiffness: 100,
+    },
+  },
+};
+
+// Debounced search handler
+const debouncedSearch = debounce(
+  (callback: (query: string) => void, query: string) => {
+    callback(query);
+  },
+  SEARCH_DEBOUNCE_MS
+);
+
 export default function Home() {
-  const [images, setImages] = useState<ImageType[]>([]);
+  const [allImages, setAllImages] = useState<ImageType[]>([]);
+  const [displayedImages, setDisplayedImages] = useState<ImageType[]>([]);
+  const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
   const [fuse, setFuse] = useState<Fuse<ImageType> | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
-  // Initialize Fuse instance after images are loaded
+  // Initialize Fuse instance
   useEffect(() => {
-    if (images.length > 0) {
-      setFuse(new Fuse(images, fuseOptions));
+    if (allImages.length > 0) {
+      setFuse(new Fuse(allImages, fuseOptions));
     }
-  }, [images]);
+  }, [allImages]);
 
-  // Fetch images
+  // Fetch initial images
   useEffect(() => {
     let mounted = true;
 
@@ -41,7 +84,8 @@ export default function Home() {
       try {
         const fetchedImages = await getImages();
         if (mounted) {
-          setImages(fetchedImages);
+          setAllImages(fetchedImages);
+          setDisplayedImages(fetchedImages.slice(0, ITEMS_PER_PAGE));
           setIsLoading(false);
         }
       } catch (error) {
@@ -59,183 +103,81 @@ export default function Home() {
     };
   }, []);
 
-  // Debounced search handler
-  const debouncedSearch = useCallback(
-    debounce((query: string) => {
-      setDebouncedSearchQuery(query);
-    }, 300),
-    []
-  );
+  // Handle search
+  const handleDebouncedSearch = useCallback((query: string) => {
+    setDebouncedSearchQuery(query);
+    setPage(1);
+  }, []);
 
-  // Handle search input change
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
-    debouncedSearch(query);
+    debouncedSearch(handleDebouncedSearch, query);
   };
 
-  // Get filtered results using debounced query
+  // Get filtered results
   const filteredImages = useMemo(() => {
-    if (!debouncedSearchQuery || !fuse) return images;
-    return fuse.search(debouncedSearchQuery).map(result => result.item);
-  }, [debouncedSearchQuery, images, fuse]);
-
-  const handleImageClick = useCallback((imageId: string) => {
-    const index = images.findIndex(img => img.id === imageId);
-    if (index !== -1) {
-      setSelectedImageIndex(index);
-      setModalOpen(true);
+    if (!debouncedSearchQuery || !fuse) return allImages;
+    
+    // First try exact match
+    const exactMatch = allImages.find(img => 
+      img.code.toLowerCase() === debouncedSearchQuery.toLowerCase()
+    );
+    
+    if (exactMatch) {
+      return [exactMatch];
     }
-  }, [images]);
+    
+    // If no exact match, use Fuse search with strict threshold
+    const searchResults = fuse.search(debouncedSearchQuery);
+    
+    // Only return high confidence matches (score closer to 0 means better match)
+    return searchResults
+      .filter(result => result.score && result.score < 0.3)
+      .map(result => result.item);
+  }, [debouncedSearchQuery, allImages, fuse]);
 
-  // Handle modal close
-  const handleCloseModal = useCallback(() => {
-    setModalOpen(false);
-  }, []);
+  // Update displayed images when search query changes
+  useEffect(() => {
+    // Reset pagination when search query changes
+    setPage(1);
+    
+    // Update displayed images with first page of filtered results
+    const initialImages = filteredImages.slice(0, ITEMS_PER_PAGE);
+    setDisplayedImages(initialImages);
+    
+    // Update hasMore flag
+    setHasMore(filteredImages.length > ITEMS_PER_PAGE);
+  }, [filteredImages]);
 
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: {
-      opacity: 0,
-      y: 20,
-    },
-    show: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        type: "spring",
-        stiffness: 100,
-      },
-    },
-  };
+  // Load more images
+  const loadMoreImages = useCallback(() => {
+    const startIndex = page * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const newImages = filteredImages.slice(0, endIndex);
+    
+    setDisplayedImages(newImages);
+    setPage(prev => prev + 1);
+    setHasMore(endIndex < filteredImages.length);
+  }, [page, filteredImages]);
 
   return (
-    <>
-      <main className="mx-auto max-w-[1960px] p-4" role="main">
-        {/* Search Input */}
-        <div className="mb-8 relative max-w-xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="relative"
-          >
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Tìm kiếm theo mã hoặc số..."
-              value={searchQuery}
-              onChange={handleSearchChange}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-            />
-          </motion.div>
-        </div>
+    <main className="mx-auto max-w-[1960px] p-4" role="main">
+      <SearchBar 
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
+      />
 
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4"
-        >
-          {/* Header Card */}
-          <motion.div
-            variants={itemVariants}
-            className="relative flex flex-col items-center justify-end gap-4 rounded-lg bg-white/10 dark:bg-gray-800/50 px-6 pb-16 pt-16 text-center shadow-highlight"
-          >
-            <div className="absolute inset-0 flex items-center justify-center opacity-20">
-              <span className="absolute left-0 right-0 bottom-0 h-[400px] bg-gradient-to-b from-black/0 via-black to-black dark:from-gray-900/0 dark:via-gray-900 dark:to-gray-900"></span>
-            </div>
-            <h1 className="mt-8 mb-4 text-2xl font-bold text-gray-900 dark:text-white">Thư Viện Ảnh FGO</h1>
-            <p className="max-w-[40ch] text-gray-700 dark:text-gray-300 sm:max-w-[32ch]">
-              Duyệt và khám phá bộ sưu tập hình ảnh FGO
-            </p>
-          </motion.div>
-
-          {/* Image Grid */}
-          <AnimatePresence mode="wait">
-            {isLoading ? (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="col-span-full flex justify-center items-center py-20"
-              >
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-              </motion.div>
-            ) : filteredImages.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="col-span-full text-center py-20"
-              >
-                <p className="text-gray-500 dark:text-gray-400">Không tìm thấy hình ảnh</p>
-              </motion.div>
-            ) : (
-              filteredImages.map((image, index) => (
-                <motion.button
-                  key={image.id}
-                  variants={itemVariants}
-                  layoutId={image.id}
-                  onClick={() => handleImageClick(image.id)}
-                  className="group relative block w-full rounded-lg shadow-highlight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  aria-label={`Xem chi tiết hình ảnh ${image.code}`}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                    transition: {
-                      delay: index * 0.1,
-                      duration: 0.5,
-                      ease: "easeOut",
-                    },
-                  }}
-                >
-                  <div className="relative aspect-[3/2]">
-                    <Image
-                      alt={`Hình ảnh FGO ${image.code}`}
-                      className="transform rounded-lg brightness-90 transition will-change-auto group-hover:brightness-110 group-focus:brightness-110"
-                      style={{ transform: "translate3d(0, 0, 0)" }}
-                      src={image.url}
-                      fill
-                      sizes="(max-width: 640px) 100vw,
-                             (max-width: 1280px) 50vw,
-                             (max-width: 1536px) 33vw,
-                             25vw"
-                      priority
-                      loading="eager"
-                      quality={85}
-                    />
-                  </div>
-                </motion.button>
-              ))
-            )}
-          </AnimatePresence>
-        </motion.div>
-      </main>
-
-      {/* Modal */}
-      <AnimatePresence>
-        {modalOpen && images.length > 0 && (
-          <Modal 
-            images={images}
-            initialIndex={selectedImageIndex}
-            onClose={handleCloseModal}
-          />
-        )}
-      </AnimatePresence>
-    </>
+      <ImageGrid
+        images={displayedImages}
+        isLoading={isLoading}
+        hasMore={hasMore}
+        onLoadMore={loadMoreImages}
+        containerVariants={containerVariants}
+        itemVariants={itemVariants}
+      >
+        <HeaderCard variants={itemVariants} />
+      </ImageGrid>
+    </main>
   );
 }

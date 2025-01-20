@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
         hostname: '**',
       },
     ],
+    minimumCacheTTL: 31536000,
   },
   typescript: {
     ignoreBuildErrors: true,
@@ -19,6 +20,19 @@ const nextConfig: NextConfig = {
     scrollRestoration: true,
   },
   staticPageGenerationTimeout: 120,
+  headers: async () => {
+    return [
+      {
+        source: '/_next/image/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

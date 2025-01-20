@@ -30,3 +30,83 @@ body {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
+
+/* Swiper custom styles */
+.mainSwiper {
+  width: 100%;
+  height: 100%;
+}
+
+.mainSwiper .swiper-button-next,
+.mainSwiper .swiper-button-prev {
+  color: white;
+  background: rgba(0, 0, 0, 0.5);
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 50%;
+  backdrop-filter: blur(8px);
+  margin: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  transition: all 0.2s ease;
+}
+
+.mainSwiper .swiper-button-prev {
+  left: 16px !important;
+}
+
+.mainSwiper .swiper-button-next {
+  right: 16px !important;
+}
+
+.mainSwiper .swiper-button-next:hover,
+.mainSwiper .swiper-button-prev:hover {
+  background: rgba(0, 0, 0, 0.75);
+  transform: translateY(-50%) scale(1.05) !important;
+}
+
+.mainSwiper .swiper-button-disabled {
+  opacity: 0.35 !important;
+  pointer-events: none !important;
+  transform: translateY(-50%) scale(1) !important;
+}
+
+.thumbSwiper {
+  padding: 0 20px;
+}
+
+.thumbSwiper .swiper-slide {
+  width: 120px;
+  height: 80px;
+  opacity: 0.5;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.thumbSwiper .swiper-slide-thumb-active {
+  opacity: 1;
+}
+
+/* Add shimmer animation */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.shimmer {
+  animation: shimmer 2s infinite;
+}
+
+/* Add this to your existing CSS */
+html {
+  scroll-behavior: smooth;
+}
+
+[data-image-id] {
+  scroll-margin-top: 2rem;
+  scroll-margin-bottom: 2rem;
+}

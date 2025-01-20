@@ -23,11 +23,8 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
-    const [images, photo] = await Promise.all([
-      getImages(),
-      params
-    ]);
-    const image = images.find(img => img.id === photo.id);
+    const images = await getImages();
+    const image = images.find(img => img.id === params.id);
     
     if (!image) {
       return {
@@ -56,11 +53,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ImagePage({ params }: Props) {
   try {
-    const [images, photo] = await Promise.all([
+    // Add timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Request timeout after 10 seconds'));
+      }, 10000);
+    });
+
+    // Race between the fetch and timeout
+    const images = await Promise.race([
       getImages(),
-      params
-    ]);
-    const image = images.find(img => img.id === photo.id);
+      timeoutPromise
+    ]) as Awaited<ReturnType<typeof getImages>>;
+
+    if (!images || images.length === 0) {
+      throw new Error("Failed to fetch images");
+    }
+
+    const image = images.find(img => img.id === params.id);
 
     if (!image) {
       notFound();
@@ -133,23 +143,6 @@ export default async function ImagePage({ params }: Props) {
     );
   } catch (error) {
     console.error("Error in ImagePage:", error);
-    return (
-      <div className="min-h-screen p-4 sm:p-8 bg-gray-50 dark:bg-gray-900">
-        <main className="max-w-4xl mx-auto text-center" role="main">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-            Error Loading Image
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
-            There was a problem loading the image. Please try again later.
-          </p>
-          <Link
-            href="/"
-            className="text-blue-600 dark:text-blue-400 hover:underline"
-          >
-            Return to gallery
-          </Link>
-        </main>
-      </div>
-    );
+    throw error; // Let error.tsx handle the error display
   }
 }
