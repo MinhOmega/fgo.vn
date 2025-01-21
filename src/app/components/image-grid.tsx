@@ -3,7 +3,7 @@ import { Image as ImageType } from "@prisma/client";
 import ImageCard from "./image-card";
 import ShimmerCard from "./shimmer-card";
 import { useInView } from "react-intersection-observer";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useLastViewedPhoto } from "@/utils/useLastViewedPhoto";
 
 interface ImageGridProps {
@@ -25,19 +25,41 @@ const ImageGrid = ({
   itemVariants,
   children 
 }: ImageGridProps) => {
-  const { ref, inView } = useInView({
-    threshold: 0.5,
-    rootMargin: '400px',
-    triggerOnce: false
+  const { ref: inViewRef, inView } = useInView({
+    threshold: 0,
+    rootMargin: '1500px 0px',
+    triggerOnce: false,
   });
   const { photoId, viewedImageIndex, setPhotoId, setViewedImageIndex } = useLastViewedPhoto();
+  const loadingSentinelRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const loadingRef = useRef(false);
+
+  const setRefs = useCallback(
+    (node: HTMLDivElement | null) => {
+      loadingSentinelRef.current = node;
+      inViewRef(node);
+    },
+    [inViewRef]
+  );
 
   useEffect(() => {
-    if (inView && !isLoading && hasMore) {
-      onLoadMore();
+    const shouldLoadMore = inView && hasMore && !isLoading && !loadingRef.current;
+    
+    if (shouldLoadMore) {
+      loadingRef.current = true;
+      
+      const loadMoreTimeout = setTimeout(() => {
+        onLoadMore();
+        loadingRef.current = false;
+      }, 100);
+
+      return () => {
+        clearTimeout(loadMoreTimeout);
+        loadingRef.current = false;
+      };
     }
-  }, [inView, isLoading, hasMore, onLoadMore]);
+  }, [inView, hasMore, isLoading, onLoadMore]);
 
   // Scroll to last viewed photo
   useEffect(() => {
@@ -82,7 +104,7 @@ const ImageGrid = ({
         ))}
       </AnimatePresence>
 
-      {/* Loading shimmer effect */}
+      {/* Initial loading state */}
       {isLoading && (
         <>
           {[...Array(4)].map((_, index) => (
@@ -99,27 +121,36 @@ const ImageGrid = ({
         </>
       )}
 
-      {/* Infinite scroll loading state */}
-      {!isLoading && hasMore && (
-        <>
-          <div 
-            ref={ref} 
-            className="col-span-full h-10 flex items-center justify-center"
-          >
-            <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin" />
-          </div>
-          {[...Array(2)].map((_, index) => (
-            <motion.div
-              key={`scroll-shimmer-${index}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ delay: index * 0.05 }}
-            >
-              <ShimmerCard />
-            </motion.div>
-          ))}
-        </>
+      {/* Loading sentinel and infinite scroll state */}
+      {hasMore && (
+        <div className="col-span-full">
+          {/* Invisible loading sentinel */}
+          <div
+            ref={setRefs}
+            className="h-px w-full"
+            aria-hidden="true"
+          />
+          
+          {/* Loading indicator */}
+          {!isLoading && (
+            <div className="py-8 flex flex-col items-center justify-center gap-4">
+              <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 w-full">
+                {[...Array(2)].map((_, index) => (
+                  <motion.div
+                    key={`scroll-shimmer-${index}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <ShimmerCard />
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* No results message */}

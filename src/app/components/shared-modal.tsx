@@ -1,13 +1,14 @@
 "use client";
 
 import downloadPhoto from "@/utils/downloadPhoto";
+import { useLastViewedPhoto } from "@/utils/useLastViewedPhoto";
 import {
   ArrowDownTrayIcon,
   ArrowTopRightOnSquareIcon,
   ArrowUturnLeftIcon,
-  XMarkIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  XMarkIcon
 } from "@heroicons/react/24/outline";
 import { Image as ImageType } from "@prisma/client";
 import Image from "next/image";
@@ -15,7 +16,6 @@ import { useEffect, useRef, useState } from "react";
 import type { Swiper as SwiperType } from "swiper";
 import { FreeMode, Keyboard, Navigation, Thumbs } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { useLastViewedPhoto } from "@/utils/useLastViewedPhoto";
 
 // Import Swiper styles
 import "swiper/css";

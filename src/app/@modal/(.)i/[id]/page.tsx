@@ -66,12 +66,6 @@ export default async function PhotoModal({ params }: Props) {
           <p className="text-gray-600 dark:text-gray-300">
             There was a problem loading the image gallery. Please try again later.
           </p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-          >
-            Retry
-          </button>
         </div>
       </div>
     );

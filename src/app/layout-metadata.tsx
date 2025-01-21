@@ -67,10 +67,4 @@ export const metadata: Metadata = {
     'yandex-verification': 'your-yandex-code',
     'facebook-domain-verification': 'your-facebook-code',
   },
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 5,
-    userScalable: true,
-  },
 }; 

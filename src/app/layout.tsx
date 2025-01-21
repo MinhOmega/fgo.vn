@@ -1,5 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Toaster } from "@/components/ui/toaster"
+import { Viewport } from 'next'
 
 // Optimize font loading
 const geistSans = Geist({
@@ -15,6 +17,14 @@ const geistMono = Geist_Mono({
   display: "swap",
   preload: true,
 });
+
+// Add viewport export
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+}
 
 export { metadata } from './layout-metadata';
 
@@ -107,6 +117,7 @@ export default function RootLayout({
           {children}
           {modal}
         </main>
+        <Toaster />
       </body>
     </html>
   );

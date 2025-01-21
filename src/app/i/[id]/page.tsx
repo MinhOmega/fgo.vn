@@ -3,6 +3,8 @@ import { getImages } from "@/app/actions/image"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Metadata } from "next"
+import { unstable_cache } from 'next/cache';
+import { headers } from 'next/headers';
 
 type Props = {
   params: { id: string }
@@ -21,34 +23,51 @@ export async function generateStaticParams() {
   }
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  try {
-    const images = await getImages();
-    const image = images.find(img => img.id === params.id);
-    
-    if (!image) {
-      return {
-        title: 'Không Tìm Thấy Hình Ảnh',
-        description: 'Không thể tìm thấy hình ảnh được yêu cầu'
-      }
-    }
+// Add dynamic indicator
+export const dynamic = 'force-dynamic';
 
-    return {
-      title: `Hình Ảnh FGO ${image.code} | Thư Viện FGO`,
-      description: `Xem chi tiết tác phẩm FGO ${image.code} từ thư mục ${image.folder}`,
-      openGraph: {
-        title: `Hình Ảnh FGO ${image.code}`,
-        description: `Xem chi tiết tác phẩm FGO ${image.code}`,
-        images: [image.url]
+// Cache the metadata generation
+const getMetadata = unstable_cache(
+  async (id: string) => {
+    try {
+      const images = await getImages();
+      const image = images.find(img => img.id === id);
+      
+      if (!image) {
+        return {
+          title: 'Không Tìm Thấy Hình Ảnh',
+          description: 'Không thể tìm thấy hình ảnh được yêu cầu'
+        }
+      }
+
+      return {
+        title: `Hình Ảnh FGO ${image.code} | Thư Viện FGO`,
+        description: `Xem chi tiết tác phẩm FGO ${image.code} từ thư mục ${image.folder}`,
+        openGraph: {
+          title: `Hình Ảnh FGO ${image.code}`,
+          description: `Xem chi tiết tác phẩm FGO ${image.code}`,
+          images: [image.url]
+        }
+      }
+    } catch (error) {
+      console.error("Lỗi khi tạo metadata:", error);
+      return {
+        title: 'Thư Viện FGO',
+        description: 'Xem bộ sưu tập tác phẩm FGO'
       }
     }
-  } catch (error) {
-    console.error("Lỗi khi tạo metadata:", error);
-    return {
-      title: 'Thư Viện FGO',
-      description: 'Xem bộ sưu tập tác phẩm FGO'
-    }
+  },
+  ['image-metadata'],
+  {
+    revalidate: 60, // Cache for 60 seconds
+    tags: ['image-metadata']
   }
+);
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  // Force dynamic rendering by reading headers
+  headers();
+  return getMetadata(params.id);
 }
 
 export default async function ImagePage({ params }: Props) {

@@ -14,7 +14,21 @@ model Image {
   url        String
   folder     String
   created_at DateTime @default(now())
-  updated_at DateTime @default(now()) @updatedAt
+  updated_at DateTime @updatedAt
 
+  @@index([code])
+  @@index([number])
   @@map("images")
-} 
+}
+
+model StorageRequest {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  imageCode  String
+  email      String
+  reason     String
+  status     String   @default("PENDING")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("storage_requests")
+}
