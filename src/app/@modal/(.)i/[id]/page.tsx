@@ -1,5 +1,5 @@
 import Modal from "@/app/components/modal";
-import { getImages } from "@/app/actions/image";
+import { getImages, getImageById } from "@/app/actions/image";
 import { notFound } from "next/navigation";
 
 interface Props {
@@ -23,26 +23,14 @@ export async function generateStaticParams() {
 
 export default async function PhotoModal({ params }: Props) {
   try {
-    // Add timeout promise
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => {
-        reject(new Error('Request timeout after 10 seconds'));
-      }, 10000); // 10 second timeout
-    });
+    const images = await getImages();
+    const image = await getImageById(params.id);
 
-    // Race between the fetch and timeout
-    const images = await Promise.race([
-      getImages(),
-      timeoutPromise
-    ]) as Awaited<ReturnType<typeof getImages>>;
-
-    if (!images || images.length === 0) {
-      console.error("No images returned from getImages");
-      throw new Error("Failed to fetch images");
+    if (!image || !images || images.length === 0) {
+      notFound();
     }
 
-    const photoId = params.id;
-    const imageIndex = images.findIndex(img => img.id === photoId);
+    const imageIndex = images.findIndex(img => img.id === params.id);
 
     if (imageIndex === -1) {
       notFound();

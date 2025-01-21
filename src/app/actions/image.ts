@@ -3,74 +3,78 @@
 import { prisma } from "@/lib/prisma";
 import { unstable_cache } from "next/cache";
 
-export const getImages = async () => {
+// Define types more precisely
+type ImageData = {
+  id: string;
+  code: string;
+  number: number;
+  url: string;
+  folder: string;
+  created_at: Date;
+  updated_at: Date;
+};
+
+// Cache key and options
+const CACHE_TAG = 'images';
+const CACHE_REVALIDATE_TIME = 3600; // 1 hour in seconds
+
+// Get all images from database
+export const getImages = async (): Promise<ImageData[]> => {
   try {
-    // Add timeout to Prisma query
-    const images = (await Promise.race([
-      prisma.image.findMany({
-        orderBy: {
-          number: "asc",
-        },
-        select: {
-          id: true,
-          code: true,
-          number: true,
-          url: true,
-          folder: true,
-          created_at: true,
-          updated_at: true,
-        },
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Database query timeout")), 5000)),
-    ])) as Awaited<ReturnType<typeof prisma.image.findMany>>;
+    const images = await prisma.image.findMany({
+      orderBy: {
+        number: 'asc',
+      },
+      select: {
+        id: true,
+        code: true,
+        number: true,
+        url: true,
+        folder: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
 
-
-    if (!images) {
-      throw new Error("No images returned from database");
+    if (!images || images.length === 0) {
+      return [];
     }
 
-    return images.map((image) => ({
-      ...image,
-      created_at: image.created_at,
-      updated_at: image.updated_at,
-    }));
+    return images;
   } catch (error) {
     console.error("Error fetching images:", error);
-    throw error; // Re-throw to handle in the component
+    return [];
   }
 };
 
-export const getImageById = unstable_cache(
-  async (id: string) => {
-    try {
-      const image = await prisma.image.findUnique({
-        where: { id },
-        select: {
-          id: true,
-          code: true,
-          number: true,
-          url: true,
-          folder: true,
-          created_at: true,
-          updated_at: true,
-        },
-      });
+// Helper function to get a single image by ID (with caching)
+export const getImageById = async (id: string): Promise<ImageData | null> => {
+  return unstable_cache(
+    async () => {
+      try {
+        const image = await prisma.image.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            code: true,
+            number: true,
+            url: true,
+            folder: true,
+            created_at: true,
+            updated_at: true,
+          },
+        });
 
-      if (!image) return null;
-
-      return {
-        ...image,
-        created_at: image.created_at,
-        updated_at: image.updated_at,
-      };
-    } catch (error) {
-      console.error("Error fetching image:", error);
-      return null;
+        return image;
+      } catch (error) {
+        console.error(`Error fetching image with ID ${id}:`, error);
+        return null;
+      }
+    },
+    [`${CACHE_TAG}-${id}`],
+    {
+      revalidate: CACHE_REVALIDATE_TIME,
+      tags: [CACHE_TAG, `${CACHE_TAG}-${id}`],
     }
-  },
-  ["image-detail"],
-  {
-    revalidate: 60,
-    tags: ["image"],
-  },
-);
+  )();
+};
