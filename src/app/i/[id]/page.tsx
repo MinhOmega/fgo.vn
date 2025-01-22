@@ -1,4 +1,6 @@
-import { getImages, getImageById } from "@/app/actions/image";
+'use cache'
+
+import { getImageById, getImages } from "@/app/actions/image";
 import { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -6,7 +8,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 
 type Props = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
 export async function generateStaticParams() {
@@ -53,12 +55,14 @@ const getMetadata = cache(async (id: string) => {
 });
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  return getMetadata(params.id);
+  const id = (await params).id
+  return getMetadata(id);
 }
 
 export default async function ImagePage({ params }: Props) {
   try {
-    const image = await getImageById(params.id);
+    const id = (await params).id
+    const image = await getImageById(id);
 
     if (!image) {
       notFound();

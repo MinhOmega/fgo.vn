@@ -9,7 +9,7 @@ import { Image as ImageType } from "@prisma/client";
 
 interface ModalProps {
   images: ImageType[];
-  initialIndex: number;
+  initialIndex?: number;
 }
 
 const Modal = ({ images, initialIndex }: ModalProps) => {
@@ -35,7 +35,7 @@ const Modal = ({ images, initialIndex }: ModalProps) => {
         />
       </div>
       <SharedModal
-        index={initialIndex}
+        index={initialIndex ?? 0}
         images={images}
         changePhotoId={(newIndex) => {
           router.push(`/i/${images[newIndex].id}`, { scroll: false });

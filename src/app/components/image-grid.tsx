@@ -27,8 +27,7 @@ const ImageGrid = ({
 }: ImageGridProps) => {
   const { ref: inViewRef, inView } = useInView({
     threshold: 0,
-    rootMargin: '1500px 0px',
-    triggerOnce: false,
+    rootMargin: '300px 0px',
   });
   const { photoId, viewedImageIndex, setPhotoId, setViewedImageIndex } = useLastViewedPhoto();
   const loadingSentinelRef = useRef<HTMLDivElement>(null);
@@ -52,7 +51,7 @@ const ImageGrid = ({
       const loadMoreTimeout = setTimeout(() => {
         onLoadMore();
         loadingRef.current = false;
-      }, 100);
+      }, 10);
 
       return () => {
         clearTimeout(loadMoreTimeout);

@@ -18,6 +18,8 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     scrollRestoration: true,
+    dynamicIO: true,
+    serverComponentsHmrCache: false,
   },
   staticPageGenerationTimeout: 120,
   headers: async () => {
